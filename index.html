@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#f3f5f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111714" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Hofsuche">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<title>Hofsuche</title>
+<style>
+/* Mobile-first Arbeitsliste: Kopf, Filter-Leiste, Karten in einer Spalte, Tab-Leiste unten */
+:root {
+  --bg: #f3f5f1; --surface: #ffffff; --sunk: #e9ede7; --fg: #1b2620; --muted: #5b6961; --line: #d9e0d8;
+  --accent: #2a4cae; --accent-soft: #e3e9f8; --hay: #9a6c0c; --hay-soft: #f6ecd2;
+  --ok: #2e7548; --ok-soft: #dcefe2; --warn: #9a5a0c; --warn-soft: #f5e7d3; --bad: #a3322a;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 12px;
+  --tabbar: 64px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111714; --surface: #19211d; --sunk: #222c27; --fg: #e5ebe6; --muted: #9caba3; --line: #2d3833;
+    --accent: #93abf4; --accent-soft: #232d48; --hay: #e2b24c; --hay-soft: #3a2f16;
+    --ok: #74c493; --ok-soft: #1d3326; --warn: #e2a35c; --warn-soft: #3b2a17; --bad: #f08a80;
+    color-scheme: dark;
+  }
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.45 var(--font); overflow-x: hidden; }
+a { color: var(--accent); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button, a, label, summary { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+.wrap { max-width: 860px; margin: 0 auto; padding: calc(env(safe-area-inset-top, 0px) + 14px) max(14px, env(safe-area-inset-right, 0px)) calc(var(--tabbar) + env(safe-area-inset-bottom, 0px) + 24px) max(14px, env(safe-area-inset-left, 0px)); display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.wrap > * { min-width: 0; }
+
+/* Kopf */
+.head { display: grid; gap: 6px; }
+.head .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.eyebrow { font-size: 12px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+h1 { font-family: var(--serif); font-size: 28px; line-height: 1.1; margin: 0; }
+.who { font-size: 14px; color: var(--muted); background: none; border: 0; padding: 6px 0 6px 8px; cursor: pointer; white-space: nowrap; }
+.who b { color: var(--fg); }
+.stand { font-size: 14px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 12px; }
+.stand b { color: var(--fg); font-weight: 600; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); display: inline-block; margin-right: 6px; vertical-align: 1px; }
+.runrow { display: grid; gap: 6px; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 14px; min-height: 44px; font-size: 15px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; color: var(--fg); text-align: center; }
+.btn:active { background: var(--sunk); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.btn.primary:active { filter: brightness(.9); }
+.btn:disabled { opacity: .5; cursor: default; }
+.runmsg { font-size: 14px; color: var(--muted); }
+
+/* Filter */
+.filters { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+.filters > summary { list-style: none; cursor: pointer; padding: 12px 14px; min-height: 52px; display: flex; align-items: center; gap: 10px; }
+.filters > summary::-webkit-details-marker { display: none; }
+.filters .ft { font-weight: 700; }
+.filters .fsum { flex: 1 1 auto; min-width: 0; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+.filters .chev { color: var(--muted); transition: transform .15s; }
+.filters[open] .chev { transform: rotate(180deg); }
+.fbody { border-top: 1px solid var(--line); padding: 14px; display: grid; gap: 18px; }
+.field { display: grid; gap: 6px; min-width: 0; }
+.field > .lbl { font-size: 13px; font-weight: 700; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+.field > .lbl output { color: var(--fg); font-family: var(--mono); font-weight: 500; }
+input[type="range"] { width: 100%; margin: 0; height: 36px; accent-color: var(--accent); }
+select { width: 100%; min-height: 44px; font-size: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--sunk); padding: 8px 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 1px solid var(--line); background: var(--sunk); border-radius: 999px; padding: 8px 16px; min-height: 42px; font-size: 15px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.checks { display: grid; }
+.checks label { display: flex; align-items: center; gap: 12px; min-height: 46px; cursor: pointer; }
+.checks input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
+.fnote { font-size: 13px; color: var(--muted); }
+.fbtns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Liste */
+.listhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.listhead h2 { font-size: 20px; margin: 0; }
+.listhead .sort { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
+.listhead .sort select { width: auto; min-width: 0; }
+.list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.list > * { min-width: 0; }
+.empty { border: 1px dashed var(--line); border-radius: var(--r); padding: 26px 18px; color: var(--muted); text-align: center; }
+.note-hidden { font-size: 14px; color: var(--muted); text-align: center; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.card.saved { border-color: color-mix(in srgb, var(--hay) 60%, var(--line)); box-shadow: inset 4px 0 0 var(--hay); }
+.card.off { opacity: .7; }
+.card h3 { font-family: var(--serif); font-weight: 600; font-size: 19px; line-height: 1.25; margin: 0; overflow-wrap: anywhere; }
+.card h3 a { color: var(--fg); text-decoration: none; }
+.prow { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.price { font-family: var(--mono); font-size: 20px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.price .ptext { font-family: var(--font); font-size: 16px; display: block; line-height: 1.3; }
+.price small { display: block; font-family: var(--font); font-size: 13px; font-weight: 400; color: var(--muted); line-height: 1.35; }
+.score { flex: none; display: grid; justify-items: end; gap: 4px; font-size: 13px; color: var(--muted); }
+.meter { width: 84px; height: 7px; border-radius: 4px; background: var(--sunk); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--accent); }
+.where { font-size: 15px; color: var(--muted); overflow-wrap: anywhere; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill { font-size: 12.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--sunk); color: var(--muted); }
+.pill.new { background: var(--accent); color: var(--surface); }
+.pill.good { background: var(--ok-soft); color: var(--ok); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.priv { background: var(--accent-soft); color: var(--accent); }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; font-size: 15px; }
+.facts b { overflow-wrap: anywhere; }
+.facts div { min-width: 0; }
+.facts span { color: var(--muted); display: block; font-size: 12.5px; }
+.facts b { font-family: var(--mono); font-weight: 500; }
+.facts .wide { grid-column: 1 / -1; }
+.facts .wide b { font-family: var(--font); font-weight: 400; overflow-wrap: anywhere; }
+.txt { margin: 0; overflow-wrap: break-word; hyphens: auto; -webkit-hyphens: auto; }
+.txt.muted { color: var(--muted); font-size: 15px; }
+.txt strong { color: var(--fg); }
+.actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.actions .btn { padding: 8px 4px; font-size: 14px; }
+.btn.star[aria-pressed="true"] { background: var(--hay-soft); border-color: var(--hay); color: var(--hay); }
+.links { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 14px; }
+.by { font-size: 13px; color: var(--hay); }
+.notes { border-top: 1px solid var(--line); padding-top: 8px; }
+.notes summary { cursor: pointer; min-height: 40px; display: flex; align-items: center; font-size: 15px; color: var(--muted); font-weight: 600; }
+.nlist { display: grid; gap: 8px; margin: 4px 0 10px; }
+.nitem { background: var(--sunk); border-radius: 10px; padding: 8px 10px; font-size: 15px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.nitem .meta { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--muted); white-space: normal; margin-bottom: 2px; }
+.nitem .meta button { background: none; border: 0; color: var(--muted); padding: 0 2px; cursor: pointer; font-size: 12.5px; text-decoration: underline; }
+.nform { display: grid; gap: 8px; }
+textarea { width: 100%; min-height: 76px; font-size: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--sunk); padding: 10px; resize: vertical; }
+
+/* Verlauf */
+.run { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; display: grid; gap: 6px; }
+.run .rt { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-weight: 700; }
+.run .rt span { font-weight: 400; color: var(--muted); font-size: 14px; }
+.run p { margin: 0; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+.info { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 4px 14px; }
+.info summary { cursor: pointer; font-weight: 700; min-height: 46px; display: flex; align-items: center; }
+.info p, .info li { font-size: 15px; color: var(--muted); overflow-wrap: break-word; }
+.info ul { padding-left: 18px; }
+.qlist { display: grid; gap: 4px; font-size: 14px; padding-bottom: 10px; }
+.qlist div { overflow-wrap: anywhere; }
+
+/* Tab-Leiste unten */
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: color-mix(in srgb, var(--surface) 94%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border-top: 1px solid var(--line); padding: 0 max(6px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(6px, env(safe-area-inset-left, 0px)); }
+.tabbar .in { max-width: 860px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); height: var(--tabbar); }
+.tab { background: none; border: 0; display: grid; place-content: center; justify-items: center; gap: 1px; color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; min-width: 0; padding: 0 2px; }
+.tab .ic { font-size: 20px; line-height: 1; }
+.tab .n { font-family: var(--mono); font-size: 11px; min-height: 13px; }
+.tab[aria-selected="true"] { color: var(--accent); }
+
+/* Dialog */
+.overlay { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 20px; }
+.dialog { background: var(--surface); border-radius: 16px; padding: 20px; width: 100%; max-width: 380px; display: grid; gap: 12px; }
+.dialog h2 { margin: 0; font-size: 20px; }
+.dialog p { margin: 0; color: var(--muted); font-size: 15px; }
+.dialog input { width: 100%; min-height: 48px; font-size: 17px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--sunk); }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--tabbar) + env(safe-area-inset-bottom, 0px) + 12px); z-index: 40; background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 14px; max-width: calc(100vw - 32px); text-align: center; }
+.err { background: var(--warn-soft); color: var(--warn); border-radius: var(--r); padding: 12px 14px; font-size: 15px; }
+
+@media (min-width: 700px) {
+  h1 { font-size: 34px; }
+  .runrow { grid-template-columns: auto 1fr; align-items: center; gap: 12px; }
+  .fbody .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 24px; }
+}
+@media (hover: hover) { .btn:hover { border-color: var(--accent); } .card h3 a:hover { color: var(--accent); } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header class="head">
+    <div class="top">
+      <div class="eyebrow">Hofsuche · ab Altach</div>
+      <button class="who" id="who" type="button" hidden></button>
+    </div>
+    <h1>Bauernhof für die Pension</h1>
+    <div class="stand" id="stand">Lade …</div>
+    <div class="runrow">
+      <button class="btn primary" id="runbtn" type="button" hidden>Jetzt suchen</button>
+      <div class="runmsg" id="runmsg" role="status"></div>
+    </div>
+  </header>
+
+  <div class="err" id="err" hidden></div>
+
+  <details class="filters" id="filters">
+    <summary><span class="ft">Filter</span><span class="fsum" id="fsum"></span><span class="chev" aria-hidden="true">▾</span></summary>
+    <div class="fbody">
+      <div class="grid2" style="display:grid;gap:18px">
+        <div class="field"><div class="lbl"><label for="f-budget">Budget bis</label><output id="o-budget"></output></div>
+          <input id="f-budget" type="range" min="200000" max="4000000" step="50000"></div>
+        <div class="field"><div class="lbl"><label for="f-fahrt">Fahrzeit ab Altach bis</label><output id="o-fahrt"></output></div>
+          <input id="f-fahrt" type="range" min="20" max="120" step="5"></div>
+        <div class="field"><div class="lbl"><label for="f-grund">Grund mindestens</label></div>
+          <select id="f-grund">
+            <option value="0">egal</option><option value="1000">1.000 m²</option><option value="2000">2.000 m²</option><option value="5000">5.000 m²</option>
+            <option value="10000">1 ha</option><option value="20000">2 ha</option><option value="50000">5 ha</option><option value="100000">10 ha</option>
+            <option value="150000">15 ha</option><option value="200000">20 ha</option><option value="300000">30 ha</option>
+          </select></div>
+        <div class="field"><div class="lbl"><label for="f-wohn">Wohnfläche mindestens</label></div>
+          <select id="f-wohn">
+            <option value="0">egal</option><option value="120">120 m²</option><option value="180">180 m²</option><option value="250">250 m²</option><option value="350">350 m²</option>
+          </select></div>
+      </div>
+      <div class="field"><div class="lbl"><span>Angebotsart</span></div>
+        <div class="chips" id="f-angebot">
+          <button class="chip" type="button" data-v="Kauf">Kauf</button>
+          <button class="chip" type="button" data-v="Pacht">Pacht</button>
+          <button class="chip" type="button" data-v="Miete">Miete</button>
+        </div></div>
+      <div class="checks">
+        <label><input type="checkbox" id="f-stall"> nur mit Stall, Scheune oder Nebengebäuden</label>
+        <label><input type="checkbox" id="f-san"> Sanierungsfälle zeigen</label>
+        <label><input type="checkbox" id="f-ohne"> auch Höfe ohne Preisangabe</label>
+        <label><input type="checkbox" id="f-off"> auch Inserate, die offline sein könnten</label>
+      </div>
+      <div class="fbtns"><button class="btn" type="button" id="f-reset">Filter zurücksetzen</button></div>
+      <div class="fnote">Die Filter gelten für alle in der Familie und bestimmen auch, wie weit die automatische Suche schaut.</div>
+    </div>
+  </details>
+
+  <section id="view" aria-live="polite"></section>
+</div>
+
+<nav class="tabbar" aria-label="Bereiche">
+  <div class="in" role="tablist">
+    <button class="tab" role="tab" data-tab="neu" type="button"><span class="ic" aria-hidden="true">⌂</span>Vorschläge<span class="n" id="n-neu"></span></button>
+    <button class="tab" role="tab" data-tab="gemerkt" type="button"><span class="ic" aria-hidden="true">★</span>Gemerkt<span class="n" id="n-gemerkt"></span></button>
+    <button class="tab" role="tab" data-tab="archiviert" type="button"><span class="ic" aria-hidden="true">▣</span>Archiv<span class="n" id="n-archiviert"></span></button>
+    <button class="tab" role="tab" data-tab="info" type="button"><span class="ic" aria-hidden="true">ⓘ</span>Suche<span class="n" id="n-info"></span></button>
+  </div>
+</nav>
+
+<div class="overlay" id="namedlg" hidden>
+  <form class="dialog" id="nameform">
+    <h2>Wer bist du?</h2>
+    <p>Dein Name steht bei allem, was du merkst, archivierst oder notierst, damit die anderen sehen, von wem es kommt.</p>
+    <input id="nameinput" autocomplete="given-name" maxlength="40" placeholder="z. B. Mama" required>
+    <button class="btn primary" type="submit">Speichern</button>
+  </form>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+  const SUPA = "https://feiorquayogvmciexawu.supabase.co";
+  const ANON = "sb_publishable_9BKCHD9mfNBPyrQ_Q6ZFDw_CeXetTVp";
+  const DEF = { budgetMax: 4000000, grundMin: 0, wohnMin: 0, fahrzeitMax: 75, angebot: ["Kauf", "Pacht", "Miete"], nurStall: false, sanierung: true, ohnePreis: true, offline: false };
+  const $ = (id) => document.getElementById(id);
+  const ls = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+
+  // ---------- Zugangsschlüssel aus dem Link ----------
+  const m = location.hash.match(/k=([A-Za-z0-9]{16,64})/);
+  let KEY = m ? m[1] : ls.get("hof-key");
+  if (m) ls.set("hof-key", m[1]);
+  if (KEY && !m) { try { history.replaceState(null, "", location.pathname + location.search + "#k=" + KEY); } catch (e) {} }
+
+  const S = { d: null, filter: { ...DEF }, tab: ls.get("hof-tab") || "neu", sort: ls.get("hof-sort") || "score", name: ls.get("hof-name") || "", lastVisit: Number(ls.get("hof-lastvisit") || 0), openNotes: new Set(), busy: false };
+  const visitStart = Date.now();
+
+  const nf = new Intl.NumberFormat("de-DE");
+  const money = (n) => n == null ? null : n >= 1e6 ? (n / 1e6).toLocaleString("de-DE", { maximumFractionDigits: 2 }) + " Mio. €" : nf.format(Math.round(n)) + " €";
+  const area = (n) => n == null ? "–" : n >= 10000 ? (n / 10000).toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " ha" : nf.format(Math.round(n)) + " m²";
+  const dt = new Intl.DateTimeFormat("de-AT", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Vienna" });
+  const fmt = (iso) => { try { return dt.format(new Date(iso)); } catch (e) { return ""; } };
+  const ago = (iso) => { const s = (Date.now() - new Date(iso).getTime()) / 1000; if (s < 90) return "gerade eben"; if (s < 3600) return "vor " + Math.round(s / 60) + " Min."; if (s < 86400) return "vor " + Math.round(s / 3600) + " Std."; return fmt(iso); };
+
+  function h(tag, a, ...kids) {
+    const el = document.createElement(tag);
+    if (a) for (const [k, v] of Object.entries(a)) {
+      if (v == null || v === false) continue;
+      if (k === "class") el.className = v; else if (k === "text") el.textContent = v;
+      else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+      else el.setAttribute(k, v === true ? "" : v);
+    }
+    for (const c of kids.flat()) if (c != null && c !== false) el.append(c instanceof Node ? c : document.createTextNode(String(c)));
+    return el;
+  }
+  let toastT;
+  function toast(t) { const el = $("toast"); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (el.hidden = true), 2600); }
+  function showErr(t) { $("err").textContent = t; $("err").hidden = !t; }
+
+  async function rpc(fn, params) {
+    const r = await fetch(SUPA + "/rest/v1/rpc/" + fn, {
+      method: "POST",
+      headers: { apikey: ANON, Authorization: "Bearer " + ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_key: KEY, ...params }),
+    });
+    const txt = await r.text();
+    if (!r.ok) { let msg = txt; try { msg = JSON.parse(txt).message || txt; } catch (e) {} const e = new Error(msg); e.status = r.status; throw e; }
+    return txt ? JSON.parse(txt) : null;
+  }
+
+  // ---------- Bewertung & Filter ----------
+  function score(l) {
+    let s = 0;
+    const w = l.wohnflaeche || 0;
+    s += w >= 250 ? 28 : w >= 200 ? 24 : w >= 160 ? 15 : w >= 120 ? 8 : 0;
+    if (l.stall) s += 25; else if (l.nebengebaeude) s += 12;
+    const g = l.grund || 0;
+    s += g >= 10000 ? 18 : g >= 5000 ? 14 : g >= 2000 ? 8 : g >= 1000 ? 4 : 0;
+    const f = l.fahrzeit || 120;
+    s += f <= 40 ? 14 : f <= 55 ? 10 : f <= 70 ? 6 : 2;
+    s += ({ saniert: 10, gepflegt: 10, "renovierungsbedürftig": 6, "sanierungsbedürftig": 0 })[l.zustand] ?? 4;
+    if (l.alleinlage) s += 5;
+    return Math.min(100, s);
+  }
+  function passes(l) {
+    const f = S.filter;
+    if (l.preis != null && f.budgetMax < 4000000 && Number(l.preis) > f.budgetMax) return false;
+    if (l.preis == null && f.ohnePreis === false) return false;
+    if (f.grundMin && (l.grund == null || Number(l.grund) < f.grundMin)) return false;
+    if (f.wohnMin && (l.wohnflaeche == null || Number(l.wohnflaeche) < f.wohnMin)) return false;
+    if (l.fahrzeit != null && l.fahrzeit > f.fahrzeitMax) return false;
+    if (!(f.angebot || []).includes(l.angebot || "Kauf")) return false;
+    if (f.nurStall && !l.stall && !l.nebengebaeude) return false;
+    if (f.sanierung === false && l.zustand === "sanierungsbedürftig") return false;
+    if (!f.offline && l.aktiv === false) return false;
+    return true;
+  }
+  const statusOf = (id) => (S.d && S.d.status[id] && S.d.status[id].status) || "neu";
+  const isNew = (l) => statusOf(l.id) === "neu" && S.lastVisit && new Date(l.gefunden).getTime() > S.lastVisit;
+
+  // ---------- Filter-UI ----------
+  function fsum() {
+    const f = S.filter, p = [];
+    p.push(f.budgetMax >= 4000000 ? "jedes Budget" : "bis " + money(f.budgetMax));
+    p.push("bis " + f.fahrzeitMax + " Min");
+    if (f.grundMin) p.push("ab " + area(f.grundMin));
+    if (f.wohnMin) p.push("ab " + f.wohnMin + " m² Wohnen");
+    if ((f.angebot || []).length < 3) p.push((f.angebot || []).join(" + "));
+    if (f.nurStall) p.push("mit Stall");
+    if (f.sanierung === false) p.push("ohne Sanierungsfälle");
+    if (f.ohnePreis === false) p.push("nur mit Preis");
+    return p.join(" · ");
+  }
+  function drawFilters() {
+    const f = S.filter;
+    if (document.activeElement !== $("f-budget")) $("f-budget").value = f.budgetMax;
+    if (document.activeElement !== $("f-fahrt")) $("f-fahrt").value = f.fahrzeitMax;
+    $("o-budget").textContent = f.budgetMax >= 4000000 ? "unbegrenzt" : money(f.budgetMax);
+    $("o-fahrt").textContent = f.fahrzeitMax + " Min";
+    $("f-grund").value = String(f.grundMin || 0);
+    $("f-wohn").value = String(f.wohnMin || 0);
+    for (const c of $("f-angebot").children) c.setAttribute("aria-pressed", (f.angebot || []).includes(c.dataset.v) ? "true" : "false");
+    $("f-stall").checked = !!f.nurStall; $("f-san").checked = f.sanierung !== false; $("f-ohne").checked = f.ohnePreis !== false; $("f-off").checked = !!f.offline;
+    $("fsum").textContent = fsum();
+  }
+  let fTimer;
+  function setFilter(patch, save = true) {
+    Object.assign(S.filter, patch); drawFilters(); render();
+    if (!save) return;
+    clearTimeout(fTimer);
+    fTimer = setTimeout(async () => { try { await rpc("hof_filter", { p_filter: S.filter }); } catch (e) { toast("Filter konnte nicht gespeichert werden."); } }, 800);
+  }
+  $("f-budget").addEventListener("input", (e) => setFilter({ budgetMax: Number(e.target.value) }, false));
+  $("f-budget").addEventListener("change", (e) => setFilter({ budgetMax: Number(e.target.value) }));
+  $("f-fahrt").addEventListener("input", (e) => setFilter({ fahrzeitMax: Number(e.target.value) }, false));
+  $("f-fahrt").addEventListener("change", (e) => setFilter({ fahrzeitMax: Number(e.target.value) }));
+  $("f-grund").addEventListener("change", (e) => setFilter({ grundMin: Number(e.target.value) }));
+  $("f-wohn").addEventListener("change", (e) => setFilter({ wohnMin: Number(e.target.value) }));
+  $("f-stall").addEventListener("change", (e) => setFilter({ nurStall: e.target.checked }));
+  $("f-san").addEventListener("change", (e) => setFilter({ sanierung: e.target.checked }));
+  $("f-ohne").addEventListener("change", (e) => setFilter({ ohnePreis: e.target.checked }));
+  $("f-off").addEventListener("change", (e) => setFilter({ offline: e.target.checked }));
+  $("f-reset").addEventListener("click", () => setFilter({ ...DEF }));
+  $("f-angebot").addEventListener("click", (e) => {
+    const c = e.target.closest(".chip"); if (!c) return;
+    const s = new Set(S.filter.angebot || []); s.has(c.dataset.v) ? s.delete(c.dataset.v) : s.add(c.dataset.v);
+    if (s.size) setFilter({ angebot: [...s] });
+  });
+  try { if (matchMedia("(min-width: 700px)").matches) $("filters").open = true; } catch (e) {}
+
+  // ---------- Aktionen ----------
+  function needName(then) {
+    if (S.name) return then();
+    const dlg = $("namedlg"); dlg.hidden = false; $("nameinput").value = ""; setTimeout(() => $("nameinput").focus(), 50);
+    dlg._then = then;
+  }
+  $("nameform").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const n = $("nameinput").value.trim().slice(0, 40); if (!n) return;
+    S.name = n; ls.set("hof-name", n); $("namedlg").hidden = true; drawWho();
+    const t = $("namedlg")._then; $("namedlg")._then = null; if (t) t();
+  });
+  $("namedlg").addEventListener("click", (e) => { if (e.target === $("namedlg")) { $("namedlg").hidden = true; $("namedlg")._then = null; } });
+  function drawWho() { const w = $("who"); w.hidden = !KEY; w.replaceChildren(S.name ? h("span", null, "Du bist ", h("b", { text: S.name })) : "Name eingeben"); }
+  $("who").addEventListener("click", () => { S.name = ""; needName(() => {}); });
+
+  async function setStatus(id, st) {
+    needName(async () => {
+      const prev = S.d.status[id];
+      S.d.status[id] = { status: st, von: S.name, am: new Date().toISOString() }; render();
+      toast(st === "gemerkt" ? "Gemerkt" : st === "archiviert" ? "Ins Archiv gelegt" : "Zurück bei den Vorschlägen");
+      try { await rpc("hof_status", { p_id: id, p_status: st, p_name: S.name }); }
+      catch (e) { if (prev) S.d.status[id] = prev; else delete S.d.status[id]; render(); toast("Speichern fehlgeschlagen. Bitte nochmal versuchen."); }
+    });
+  }
+  async function addNote(id, ta) {
+    const text = ta.value.trim(); if (!text) return;
+    needName(async () => {
+      try {
+        const nid = await rpc("hof_notiz", { p_id: id, p_text: text, p_name: S.name });
+        S.d.notizen.push({ id: nid, listing_id: id, autor: S.name, text, am: new Date().toISOString() });
+        S.openNotes.add(id); render(); toast("Notiz gespeichert");
+      } catch (e) { toast("Notiz konnte nicht gespeichert werden."); }
+    });
+  }
+  async function delNote(n) {
+    try { await rpc("hof_notiz_entfernen", { p_notiz: n.id }); S.d.notizen = S.d.notizen.filter((x) => x.id !== n.id); render(); }
+    catch (e) { toast("Löschen fehlgeschlagen."); }
+  }
+  $("runbtn").addEventListener("click", () => needName(async () => {
+    $("runbtn").disabled = true;
+    try { S.d.anfrage = await rpc("hof_suche_anfragen", { p_name: S.name }); drawStand(); toast("Suche angefordert"); }
+    catch (e) { toast("Anfrage fehlgeschlagen."); $("runbtn").disabled = false; }
+  }));
+
+  // ---------- Darstellung ----------
+  function drawStand() {
+    const st = $("stand"); st.replaceChildren();
+    if (!S.d) return;
+    const runs = S.d.runs || [], last = runs[0];
+    const L = S.d.listings || [];
+    st.append(h("span", null, h("i", { class: "dot", "aria-hidden": "true" }), "Letzte Suche ", h("b", { text: last ? ago(last.at) : "noch keine" })));
+    st.append(h("span", null, h("b", { text: String(L.filter((l) => l.aktiv !== false).length) }), " Höfe gesammelt"));
+    const a = S.d.anfrage, btn = $("runbtn"), msg = $("runmsg");
+    btn.hidden = false;
+    const lastAt = last ? new Date(last.at).getTime() : 0;
+    const open = a && a.offen && new Date(a.am).getTime() > lastAt;
+    btn.disabled = !!open;
+    btn.textContent = open ? "Suche angefordert" : "Jetzt suchen";
+    msg.textContent = open && a.gestartet ? "Suche läuft seit " + ago(a.gestartet) + (a.von ? " (angefordert von " + a.von + ")" : "") + ". Neue Höfe erscheinen hier in etwa 15 Minuten."
+      : open ? "Angefordert " + ago(a.am) + (a.von ? " von " + a.von : "") + ". Die Suche startet innerhalb einer Stunde (7–21 Uhr) und dauert rund 15 Minuten."
+      : "Automatisch jeden Morgen und Nachmittag. Neue Funde sind mit „neu“ markiert.";
+  }
+
+  function card(l) {
+    const st = S.d.status[l.id] || {}, status = st.status || "neu", sc = score(l);
+    const notes = S.d.notizen.filter((n) => n.listing_id === l.id);
+    const price = l.preis != null ? h("div", { class: "price" }, money(Number(l.preis)), l.preis_text ? h("small", { text: l.preis_text }) : l.angebot !== "Kauf" ? h("small", { text: l.angebot }) : null)
+      : h("div", { class: "price" }, h("span", { class: "ptext", text: l.preis_text || "Preis auf Anfrage" }));
+    const pills = h("div", { class: "pills" },
+      isNew(l) ? h("span", { class: "pill new", text: "neu" }) : null,
+      l.angebot && l.angebot !== "Kauf" ? h("span", { class: "pill", text: l.angebot }) : null,
+      l.stall ? h("span", { class: "pill good", text: "Stall / Scheune" }) : l.nebengebaeude ? h("span", { class: "pill good", text: "Nebengebäude" }) : null,
+      l.alleinlage ? h("span", { class: "pill", text: "Alleinlage" }) : null,
+      l.denkmal ? h("span", { class: "pill", text: "Denkmal" }) : null,
+      l.privat ? h("span", { class: "pill priv", text: "privat" }) : null,
+      l.zustand && l.zustand !== "unbekannt" ? h("span", { class: "pill" + (l.zustand === "sanierungsbedürftig" ? " warn" : ""), text: l.zustand }) : null,
+      l.aktiv === false ? h("span", { class: "pill warn", text: "evtl. offline" }) : null);
+    const facts = h("div", { class: "facts" },
+      h("div", null, h("span", { text: "Wohnfläche" }), h("b", { text: l.wohnflaeche ? nf.format(l.wohnflaeche) + " m²" : "–" })),
+      h("div", null, h("span", { text: "Grund" }), h("b", { text: area(l.grund == null ? null : Number(l.grund)) })),
+      h("div", null, h("span", { text: "Fahrzeit ab Altach" }), h("b", { text: l.fahrzeit ? "ca. " + l.fahrzeit + " Min" : "–" })),
+      h("div", null, h("span", { text: "Quelle" }), h("b", { text: (l.quelle || "–").replace(/\s*\(.*\)$/, ""), style: "font-family:var(--font)" })),
+      l.nebengebaeude ? h("div", { class: "wide" }, h("span", { text: "Gebäude" }), h("b", { text: l.nebengebaeude })) : null);
+    const saved = status === "gemerkt";
+    const actions = h("div", { class: "actions" },
+      h("button", { class: "btn star", type: "button", "aria-pressed": saved ? "true" : "false", onclick: () => setStatus(l.id, saved ? "neu" : "gemerkt"), text: saved ? "★ Gemerkt" : "☆ Merken" }),
+      status === "archiviert"
+        ? h("button", { class: "btn", type: "button", onclick: () => setStatus(l.id, "neu"), text: "Zurückholen" })
+        : h("button", { class: "btn", type: "button", onclick: () => setStatus(l.id, "archiviert"), text: "Archiv" }),
+      h("a", { class: "btn primary", href: l.url, target: "_blank", rel: "noopener noreferrer", text: "Inserat ↗" }));
+    const route = "https://www.google.com/maps/dir/?api=1&origin=" + encodeURIComponent("Altach, Österreich") + "&destination=" + encodeURIComponent((l.ort || "").replace(/\s*\(.*?\)\s*/g, " ") + ", Deutschland");
+    const ta = h("textarea", { placeholder: "Gedanken, Fragen an den Anbieter, Besichtigungstermin …", "aria-label": "Neue Notiz" });
+    const nd = h("details", { class: "notes", ontoggle: (e) => { e.target.open ? S.openNotes.add(l.id) : S.openNotes.delete(l.id); } },
+      h("summary", { text: notes.length ? "Notizen (" + notes.length + ")" : "Notiz schreiben" }),
+      notes.length ? h("div", { class: "nlist" }, notes.map((n) => h("div", { class: "nitem" },
+        h("div", { class: "meta" }, h("span", { text: (n.autor || "Jemand") + " · " + fmt(n.am) }), h("button", { type: "button", text: "löschen", onclick: () => delNote(n) })), n.text))) : null,
+      h("div", { class: "nform" }, ta, h("button", { class: "btn", type: "button", text: "Notiz speichern", onclick: () => addNote(l.id, ta) })));
+    if (S.openNotes.has(l.id)) nd.open = true;
+    return h("article", { class: "card" + (saved ? " saved" : "") + (l.aktiv === false ? " off" : ""), id: "hof-" + l.id },
+      h("h3", null, h("a", { href: l.url, target: "_blank", rel: "noopener noreferrer", text: l.titel })),
+      h("div", { class: "prow" }, price, h("div", { class: "score" }, h("span", { text: "Passung " + sc }), h("div", { class: "meter", "aria-hidden": "true" }, h("i", { style: "width:" + sc + "%" })))),
+      h("div", { class: "where", text: [l.ort, l.region].filter(Boolean).join(" · ") }),
+      pills, facts,
+      l.kurz ? h("p", { class: "txt", text: l.kurz }) : null,
+      l.fazit ? h("p", { class: "txt muted" }, h("strong", { text: "Einschätzung: " }), l.fazit) : null,
+      l.hinweis ? h("p", { class: "txt muted" }, h("strong", { text: "Achtung: " }), l.hinweis) : null,
+      actions,
+      h("div", { class: "links" }, h("a", { href: route, target: "_blank", rel: "noopener noreferrer", text: "Route ab Altach ↗" }),
+        st.von && status !== "neu" ? h("span", { class: "by", text: (status === "gemerkt" ? "gemerkt von " : "archiviert von ") + st.von }) : null),
+      nd);
+  }
+
+  function sorted(arr) {
+    const by = {
+      score: (a, b) => score(b) - score(a) || new Date(b.gefunden) - new Date(a.gefunden),
+      neu: (a, b) => new Date(b.gefunden) - new Date(a.gefunden),
+      preis: (a, b) => (a.preis == null ? 1e12 : Number(a.preis)) - (b.preis == null ? 1e12 : Number(b.preis)),
+      fahrt: (a, b) => (a.fahrzeit ?? 999) - (b.fahrzeit ?? 999),
+      grund: (a, b) => (Number(b.grund) || 0) - (Number(a.grund) || 0),
+    }[S.sort];
+    return arr.slice().sort(by);
+  }
+
+  function render() {
+    for (const t of document.querySelectorAll(".tab")) t.setAttribute("aria-selected", t.dataset.tab === S.tab ? "true" : "false");
+    const view = $("view");
+    if (!S.d) return;
+    const L = S.d.listings || [];
+    const g = { neu: [], gemerkt: [], archiviert: [] };
+    for (const l of L) g[statusOf(l.id)].push(l);
+    const vis = g.neu.filter(passes);
+    $("n-neu").textContent = vis.length; $("n-gemerkt").textContent = g.gemerkt.length; $("n-archiviert").textContent = g.archiviert.length;
+    $("n-info").textContent = "";
+    $("filters").hidden = S.tab === "info";
+    view.replaceChildren();
+    if (S.tab === "info") return renderInfo(view);
+    const rows = S.tab === "neu" ? vis : g[S.tab];
+    const title = { neu: "Vorschläge", gemerkt: "Gemerkt", archiviert: "Archiv" }[S.tab];
+    const sel = h("select", { id: "sort", "aria-label": "Sortieren", onchange: (e) => { S.sort = e.target.value; ls.set("hof-sort", S.sort); render(); } },
+      [["score", "beste Passung"], ["neu", "neueste zuerst"], ["preis", "günstigste zuerst"], ["fahrt", "kürzeste Fahrzeit"], ["grund", "größter Grund"]].map(([v, t]) => h("option", { value: v, text: t })));
+    sel.value = S.sort;
+    const newCount = S.tab === "neu" ? rows.filter(isNew).length : 0;
+    view.append(h("div", { class: "listhead" }, h("h2", null, title, newCount ? h("span", { class: "pill new", style: "margin-left:8px;vertical-align:3px", text: newCount + " neu" }) : null), h("label", { class: "sort" }, "Sortieren", sel)));
+    const list = h("div", { class: "list" });
+    if (!rows.length) list.append(h("div", { class: "empty", text: S.tab === "neu" ? (g.neu.length ? "Mit diesen Filtern bleibt nichts übrig. Lockere Budget, Grund oder Fahrzeit." : "Noch keine Vorschläge. Die nächste Suche läuft morgens oder nachmittags.") : S.tab === "gemerkt" ? "Noch nichts gemerkt. Tippe bei einem passenden Hof auf „☆ Merken“." : "Das Archiv ist leer." }));
+    for (const l of sorted(rows)) list.append(card(l));
+    view.append(list);
+    if (S.tab === "neu" && g.neu.length > vis.length) view.append(h("p", { class: "note-hidden", text: (g.neu.length - vis.length) + " weitere Höfe sind durch die Filter ausgeblendet." }));
+  }
+  function renderInfo(view) {
+    const runs = S.d.runs || [];
+    view.append(h("div", { class: "listhead" }, h("h2", { text: "Suche & Verlauf" })));
+    const box = h("div", { class: "list" });
+    box.append(h("details", { class: "info", open: true },
+      h("summary", { text: "So funktioniert’s" }),
+      h("ul", null,
+        h("li", { text: "Claude durchsucht jeden Morgen und Nachmittag Immobilienportale, Kleinanzeigen, Hofbörsen, Zwangsversteigerungen und Makler im Umkreis der eingestellten Fahrzeit ab Altach. ImmoScout24-Inserate tauchen meist über Suchportale wie immobilo mit auf." }),
+        h("li", { text: "Was euch gefällt: „Merken“. Was nicht passt: „Archiv“. Alle sehen dasselbe." }),
+        h("li", { text: "Die Passung (0–100) zählt viel Wohnraum, Stall/Scheune, Grund, kurze Fahrzeit und guten Zustand." }),
+        h("li", { text: "Fahrzeiten sind Schätzungen mit dem Auto ohne Stau." })),
+      h("p", { text: "Tipp fürs iPhone: In Safari auf „Teilen“ und „Zum Home-Bildschirm“ tippen, dann ist die Hofsuche wie eine App da." })));
+    box.append(h("details", { class: "info" },
+      h("summary", { text: "Gut zu wissen vor dem Kauf" }),
+      h("ul", null,
+        h("li", { text: "Landwirtschaftliche Flächen brauchen beim Kauf meist eine Genehmigung (Grundstückverkehr): in Bayern meist ab 2 ha, in Baden-Württemberg schon ab 1 ha. Echte Landwirte können Vorrang haben." }),
+        h("li", { text: "Höfe liegen meist im Außenbereich. Neue Ställe oder Umbauten früh mit dem Landratsamt klären." }),
+        h("li", { text: "Denkmalschutz bringt Förderung und Steuervorteile, aber Auflagen bei Fenstern, Dach und Heizung." }))));
+    const q = S.d.quellen || [];
+    box.append(h("details", { class: "info" },
+      h("summary", { text: "Durchsuchte Quellen (" + q.filter((x) => x.aktiv).length + ")" }),
+      h("div", { class: "qlist" }, q.map((x) => h("div", null, x.url ? h("a", { href: x.url, target: "_blank", rel: "noopener noreferrer", text: x.name }) : x.name,
+        h("span", { style: "color:var(--muted)", text: " · " + [x.art, x.aktiv ? null : "nicht nutzbar"].filter(Boolean).join(" · ") }))))));
+    box.append(h("h2", { style: "font-size:18px;margin:8px 0 0", text: "Letzte Suchläufe" }));
+    if (!runs.length) box.append(h("div", { class: "empty", text: "Noch keine Suchläufe." }));
+    for (const r of runs.slice(0, 40)) box.append(h("div", { class: "run" },
+      h("div", { class: "rt" }, fmt(r.at), h("span", { text: (r.neu || 0) + " neu" + (r.aktualisiert ? " · " + r.aktualisiert + " aktualisiert" : "") + ({ pc: " · über PC", erkundung: " · Erkundung" }[r.art] || "") })),
+      r.hinweis ? h("p", { text: r.hinweis }) : null));
+    view.append(box);
+  }
+
+  for (const t of document.querySelectorAll(".tab")) t.addEventListener("click", () => { S.tab = t.dataset.tab; ls.set("hof-tab", S.tab); render(); window.scrollTo(0, 0); });
+
+  // ---------- Laden ----------
+  async function load(first) {
+    if (S.busy) return; S.busy = true;
+    try {
+      const d = await rpc("hof_daten", {});
+      d.notizen = d.notizen || []; d.status = d.status || {};
+      S.d = d;
+      if (first && d.filter) S.filter = { ...DEF, ...d.filter };
+      else if (d.filter && document.activeElement?.closest?.("#filters") == null) S.filter = { ...DEF, ...d.filter };
+      showErr(""); drawFilters(); drawStand(); render();
+    } catch (e) {
+      if (e.status === 400 || /Kein Zugang/.test(e.message)) { showErr("Dieser Link ist nicht vollständig. Bitte den Link aus Ninos Nachricht verwenden."); $("filters").hidden = true; }
+      else if (first) showErr("Die Höfe konnten nicht geladen werden. Bitte Internetverbindung prüfen und die Seite neu laden.");
+    } finally { S.busy = false; }
+  }
+  function saveVisit() { ls.set("hof-lastvisit", String(visitStart)); }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") load(false); else saveVisit(); });
+  window.addEventListener("pagehide", saveVisit);
+  setInterval(() => { if (document.visibilityState === "visible") load(false); }, 120000);
+
+  drawWho(); drawFilters();
+  if (!KEY) { showErr("Dieser Link ist nicht vollständig. Bitte den Link aus Ninos Nachricht verwenden."); $("filters").hidden = true; }
+  else load(true);
+})();
+</script>
+</body>
+</html>
