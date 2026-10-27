@@ -267,7 +267,7 @@ textarea { width: 100%; min-height: 76px; font-size: 16px; border: 1px solid var
   if (m) ls.set("hof-key", m[1]);
   if (KEY && !m) { try { history.replaceState(null, "", location.pathname + location.search + "#k=" + KEY); } catch (e) {} }
 
-  const S = { d: null, filter: { ...DEF }, tab: ls.get("hof-tab") || "neu", sort: ls.get("hof-sort") || "score", name: ls.get("hof-name") || "", lastVisit: Number(ls.get("hof-lastvisit") || 0), openNotes: new Set(), busy: false };
+  const S = { d: null, filter: { ...DEF }, tab: ls.get("hof-tab") || "neu", sort: ls.get("hof-sort") || "score", name: ls.get("hof-name") || "", lastVisit: Number(ls.get("hof-lastvisit") || 0), openNotes: new Set(), busy: false, drafts: {}, filterSaving: false };
   const visitStart = Date.now();
 
   const nf = new Intl.NumberFormat("de-DE");
@@ -277,12 +277,14 @@ textarea { width: 100%; min-height: 76px; font-size: 16px; border: 1px solid var
   const fmt = (iso) => { try { return dt.format(new Date(iso)); } catch (e) { return ""; } };
   const ago = (iso) => { const s = (Date.now() - new Date(iso).getTime()) / 1000; if (s < 90) return "gerade eben"; if (s < 3600) return "vor " + Math.round(s / 60) + " Min."; if (s < 86400) return "vor " + Math.round(s / 3600) + " Std."; return fmt(iso); };
 
+  const safeUrl = (u) => (typeof u === "string" && /^https?:\/\//i.test(u.trim())) ? u.trim() : null;
   function h(tag, a, ...kids) {
     const el = document.createElement(tag);
     if (a) for (const [k, v] of Object.entries(a)) {
       if (v == null || v === false) continue;
       if (k === "class") el.className = v; else if (k === "text") el.textContent = v;
       else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+      else if (k === "href") { const u = safeUrl(v); if (u) el.setAttribute("href", u); }
       else el.setAttribute(k, v === true ? "" : v);
     }
     for (const c of kids.flat()) if (c != null && c !== false) el.append(c instanceof Node ? c : document.createTextNode(String(c)));
@@ -362,8 +364,8 @@ textarea { width: 100%; min-height: 76px; font-size: 16px; border: 1px solid var
   function setFilter(patch, save = true) {
     Object.assign(S.filter, patch); drawFilters(); render();
     if (!save) return;
-    clearTimeout(fTimer);
-    fTimer = setTimeout(async () => { try { await rpc("hof_filter", { p_filter: S.filter }); } catch (e) { toast("Filter konnte nicht gespeichert werden."); } }, 800);
+    clearTimeout(fTimer); S.filterSaving = true;
+    fTimer = setTimeout(async () => { try { await rpc("hof_filter", { p_filter: S.filter }); } catch (e) { toast("Filter konnte nicht gespeichert werden."); } finally { S.filterSaving = false; } }, 800);
   }
   $("f-budget").addEventListener("input", (e) => setFilter({ budgetMax: Number(e.target.value) }, false));
   $("f-budget").addEventListener("change", (e) => setFilter({ budgetMax: Number(e.target.value) }));
@@ -397,7 +399,7 @@ textarea { width: 100%; min-height: 76px; font-size: 16px; border: 1px solid var
   });
   $("namedlg").addEventListener("click", (e) => { if (e.target === $("namedlg")) { $("namedlg").hidden = true; $("namedlg")._then = null; } });
   function drawWho() { const w = $("who"); w.hidden = !KEY; w.replaceChildren(S.name ? h("span", null, "Du bist ", h("b", { text: S.name })) : "Name eingeben"); }
-  $("who").addEventListener("click", () => { S.name = ""; needName(() => {}); });
+  $("who").addEventListener("click", () => { const dlg = $("namedlg"); dlg.hidden = false; $("nameinput").value = S.name || ""; setTimeout(() => $("nameinput").focus(), 50); dlg._then = null; });
 
   async function setStatus(id, st) {
     needName(async () => {
@@ -414,6 +416,7 @@ textarea { width: 100%; min-height: 76px; font-size: 16px; border: 1px solid var
       try {
         const nid = await rpc("hof_notiz", { p_id: id, p_text: text, p_name: S.name });
         S.d.notizen.push({ id: nid, listing_id: id, autor: S.name, text, am: new Date().toISOString() });
+        delete S.drafts[id];
         S.openNotes.add(id); render(); toast("Notiz gespeichert");
       } catch (e) { toast("Notiz konnte nicht gespeichert werden."); }
     });
@@ -439,7 +442,8 @@ textarea { width: 100%; min-height: 76px; font-size: 16px; border: 1px solid var
     const a = S.d.anfrage, btn = $("runbtn"), msg = $("runmsg");
     btn.hidden = false;
     const lastAt = last ? new Date(last.at).getTime() : 0;
-    const open = a && a.offen && new Date(a.am).getTime() > lastAt;
+    const startT = a && (a.gestartet || a.am) ? new Date(a.gestartet || a.am).getTime() : 0;
+    const open = a && a.offen && new Date(a.am).getTime() > lastAt && (!a.gestartet || Date.now() - startT < 45 * 60000);
     btn.disabled = !!open;
     btn.textContent = open ? "Suche angefordert" : "Jetzt suchen";
     msg.textContent = open && a.gestartet ? "Suche läuft seit " + ago(a.gestartet) + (a.von ? " (angefordert von " + a.von + ")" : "") + ". Neue Höfe erscheinen hier in etwa 15 Minuten."
@@ -475,7 +479,8 @@ textarea { width: 100%; min-height: 76px; font-size: 16px; border: 1px solid var
         : h("button", { class: "btn", type: "button", onclick: () => setStatus(l.id, "archiviert"), text: "Archiv" }),
       h("a", { class: "btn primary", href: l.url, target: "_blank", rel: "noopener noreferrer", text: "Inserat ↗" }));
     const route = "https://www.google.com/maps/dir/?api=1&origin=" + encodeURIComponent("Altach, Österreich") + "&destination=" + encodeURIComponent((l.ort || "").replace(/\s*\(.*?\)\s*/g, " ") + ", Deutschland");
-    const ta = h("textarea", { placeholder: "Gedanken, Fragen an den Anbieter, Besichtigungstermin …", "aria-label": "Neue Notiz" });
+    const ta = h("textarea", { placeholder: "Gedanken, Fragen an den Anbieter, Besichtigungstermin …", "aria-label": "Neue Notiz", "data-id": l.id, oninput: (e) => { if (e.target.value) S.drafts[l.id] = e.target.value; else delete S.drafts[l.id]; } });
+    if (S.drafts[l.id]) ta.value = S.drafts[l.id];
     const nd = h("details", { class: "notes", ontoggle: (e) => { e.target.open ? S.openNotes.add(l.id) : S.openNotes.delete(l.id); } },
       h("summary", { text: notes.length ? "Notizen (" + notes.length + ")" : "Notiz schreiben" }),
       notes.length ? h("div", { class: "nlist" }, notes.map((n) => h("div", { class: "nitem" },
@@ -508,6 +513,8 @@ textarea { width: 100%; min-height: 76px; font-size: 16px; border: 1px solid var
   }
 
   function render() {
+    const fa = document.activeElement;
+    const focusId = fa && fa.tagName === "TEXTAREA" ? fa.dataset.id : null;
     for (const t of document.querySelectorAll(".tab")) t.setAttribute("aria-selected", t.dataset.tab === S.tab ? "true" : "false");
     const view = $("view");
     if (!S.d) return;
@@ -531,6 +538,7 @@ textarea { width: 100%; min-height: 76px; font-size: 16px; border: 1px solid var
     if (!rows.length) list.append(h("div", { class: "empty", text: S.tab === "neu" ? (g.neu.length ? "Mit diesen Filtern bleibt nichts übrig. Lockere Budget, Grund oder Fahrzeit." : "Noch keine Vorschläge. Die nächste Suche läuft morgens oder nachmittags.") : S.tab === "gemerkt" ? "Noch nichts gemerkt. Tippe bei einem passenden Hof auf „☆ Merken“." : "Das Archiv ist leer." }));
     for (const l of sorted(rows)) list.append(card(l));
     view.append(list);
+    if (focusId) { const t = view.querySelector('textarea[data-id="' + CSS.escape(focusId) + '"]'); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } }
     if (S.tab === "neu" && g.neu.length > vis.length) view.append(h("p", { class: "note-hidden", text: (g.neu.length - vis.length) + " weitere Höfe sind durch die Filter ausgeblendet." }));
   }
   function renderInfo(view) {
@@ -574,7 +582,7 @@ textarea { width: 100%; min-height: 76px; font-size: 16px; border: 1px solid var
       d.notizen = d.notizen || []; d.status = d.status || {};
       S.d = d;
       if (first && d.filter) S.filter = { ...DEF, ...d.filter };
-      else if (d.filter && document.activeElement?.closest?.("#filters") == null) S.filter = { ...DEF, ...d.filter };
+      else if (d.filter && !S.filterSaving && document.activeElement?.closest?.("#filters") == null) S.filter = { ...DEF, ...d.filter };
       showErr(""); drawFilters(); drawStand(); render();
     } catch (e) {
       if (e.status === 400 || /Kein Zugang/.test(e.message)) { showErr("Dieser Link ist nicht vollständig. Bitte den Link aus Ninos Nachricht verwenden."); $("filters").hidden = true; }
@@ -584,7 +592,7 @@ textarea { width: 100%; min-height: 76px; font-size: 16px; border: 1px solid var
   function saveVisit() { ls.set("hof-lastvisit", String(visitStart)); }
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") load(false); else saveVisit(); });
   window.addEventListener("pagehide", saveVisit);
-  setInterval(() => { if (document.visibilityState === "visible") load(false); }, 120000);
+  setInterval(() => { if (document.visibilityState === "visible" && document.activeElement?.tagName !== "TEXTAREA") load(false); }, 120000);
 
   drawWho(); drawFilters();
   if (!KEY) { showErr("Dieser Link ist nicht vollständig. Bitte den Link aus Ninos Nachricht verwenden."); $("filters").hidden = true; }
