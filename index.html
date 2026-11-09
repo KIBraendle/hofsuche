@@ -447,7 +447,7 @@ textarea { width: 100%; min-height: 76px; font-size: 16px; border: 1px solid var
     btn.disabled = !!open;
     btn.textContent = open ? "Suche angefordert" : "Jetzt suchen";
     msg.textContent = open && a.gestartet ? "Suche läuft seit " + ago(a.gestartet) + (a.von ? " (angefordert von " + a.von + ")" : "") + ". Neue Höfe erscheinen hier in etwa 15 Minuten."
-      : open ? "Angefordert " + ago(a.am) + (a.von ? " von " + a.von : "") + ". Die Suche startet innerhalb einer Stunde (7–21 Uhr) und dauert rund 15 Minuten."
+      : open ? "Angefordert " + ago(a.am) + (a.von ? " von " + a.von : "") + ". Die Suche startet innerhalb von 2 Stunden (7–21 Uhr) und dauert rund 15 Minuten."
       : "Automatisch jeden Morgen und Nachmittag. Neue Funde sind mit „neu“ markiert.";
   }
 
