@@ -458,7 +458,7 @@ textarea { width: 100%; min-height: 76px; font-size: 16px; border: 1px solid var
     btn.disabled = !!open;
     btn.textContent = open ? "Suche läuft" : "Jetzt suchen";
     msg.textContent = open ? "Suche läuft seit " + ago(a.gestartet || a.am) + (a.von ? " (gestartet von " + a.von + ")" : "") + ". Neue Höfe erscheinen hier in etwa 15–30 Minuten."
-      : "Automatisch um 7 und 15 Uhr, jederzeit auch mit „Jetzt suchen“. Gesucht wird immer alles, angezeigt nur, was zu euren Filtern passt.";
+      : "Automatisch um 5 und 15 Uhr (gründlich, alle Landkreise), jederzeit auch mit „Jetzt suchen“. Gesucht wird immer alles, angezeigt nur, was zu euren Filtern passt.";
   }
 
   function card(l) {
@@ -558,7 +558,7 @@ textarea { width: 100%; min-height: 76px; font-size: 16px; border: 1px solid var
     box.append(h("details", { class: "info", open: true },
       h("summary", { text: "So funktioniert’s" }),
       h("ul", null,
-        h("li", { text: "Claude durchsucht jeden Morgen und Nachmittag Immobilienportale, Kleinanzeigen, Hofbörsen, Zwangsversteigerungen und Makler im Umkreis der eingestellten Fahrzeit ab Altach. ImmoScout24-Inserate tauchen meist über Suchportale wie immobilo mit auf." }),
+        h("li", { text: "Claude durchsucht täglich um 5 und 15 Uhr gründlich alle Landkreise bis 2 Stunden ab Altach: Immobilienportale, Kleinanzeigen, Hofbörsen, Zwangsversteigerungen und Makler – auch Häuser mit Stall, Scheune oder großem Grund, die nicht als Bauernhof inseriert sind. „Jetzt suchen“ startet sofort eine schnellere Suche. ImmoScout24-Inserate tauchen meist über Suchportale wie immobilo mit auf." }),
         h("li", { text: "Was euch gefällt: „Merken“. Was nicht passt: „Archiv“. Alle sehen dasselbe." }),
         h("li", { text: "Die Passung (0–100) zählt viel Wohnraum, Stall/Scheune, Grund, kurze Fahrzeit und guten Zustand." }),
         h("li", { text: "Fahrzeiten sind Schätzungen mit dem Auto ohne Stau." })),
