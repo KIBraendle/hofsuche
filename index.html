@@ -427,8 +427,19 @@ textarea { width: 100%; min-height: 76px; font-size: 16px; border: 1px solid var
   }
   $("runbtn").addEventListener("click", () => needName(async () => {
     $("runbtn").disabled = true;
-    try { S.d.anfrage = await rpc("hof_suche_anfragen", { p_name: S.name }); drawStand(); toast("Suche angefordert"); }
-    catch (e) { toast("Anfrage fehlgeschlagen."); $("runbtn").disabled = false; }
+    try {
+      const r = await fetch(SUPA + "/functions/v1/suche-starten", {
+        method: "POST",
+        headers: { apikey: ANON, "Content-Type": "application/json" },
+        body: JSON.stringify({ key: KEY, name: S.name }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (d.anfrage) S.d.anfrage = d.anfrage;
+      if (r.ok && d.status === "gestartet") toast("Suche gestartet");
+      else if (r.ok && d.status === "laeuft") toast("Es läuft bereits eine Suche");
+      else { toast(d.fehler === "Sofortstart noch nicht eingerichtet" ? "Sofortstart wird noch eingerichtet." : "Start fehlgeschlagen. Bitte später nochmal."); load(false); }
+      drawStand();
+    } catch (e) { toast("Start fehlgeschlagen. Bitte später nochmal."); $("runbtn").disabled = false; }
   }));
 
   // ---------- Darstellung ----------
@@ -445,10 +456,9 @@ textarea { width: 100%; min-height: 76px; font-size: 16px; border: 1px solid var
     const startT = a && (a.gestartet || a.am) ? new Date(a.gestartet || a.am).getTime() : 0;
     const open = a && a.offen && new Date(a.am).getTime() > lastAt && (!a.gestartet || Date.now() - startT < 45 * 60000);
     btn.disabled = !!open;
-    btn.textContent = open ? "Suche angefordert" : "Jetzt suchen";
-    msg.textContent = open && a.gestartet ? "Suche läuft seit " + ago(a.gestartet) + (a.von ? " (angefordert von " + a.von + ")" : "") + ". Neue Höfe erscheinen hier in etwa 15 Minuten."
-      : open ? "Angefordert " + ago(a.am) + (a.von ? " von " + a.von : "") + ". Die Suche startet innerhalb von 2 Stunden (7–21 Uhr) und dauert rund 15 Minuten."
-      : "Automatisch jeden Morgen und Nachmittag. Neue Funde sind mit „neu“ markiert.";
+    btn.textContent = open ? "Suche läuft" : "Jetzt suchen";
+    msg.textContent = open ? "Suche läuft seit " + ago(a.gestartet || a.am) + (a.von ? " (gestartet von " + a.von + ")" : "") + ". Neue Höfe erscheinen hier in etwa 15–30 Minuten."
+      : "Automatisch um 7 und 15 Uhr, jederzeit auch mit „Jetzt suchen“. Gesucht wird immer alles, angezeigt nur, was zu euren Filtern passt.";
   }
 
   function card(l) {
